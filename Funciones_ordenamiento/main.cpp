@@ -19,6 +19,8 @@ struct Transformation {
     int bits;
 };
 
+const int MAX_BITS = 8;
+
 // Funciones originales
 unsigned char* loadPixels(QString input, int &width, int &height) {
     QImage imagen(input);
@@ -77,8 +79,23 @@ unsigned char rotateLeft(unsigned char value, int bits);
 void applyRotation(unsigned char* image, int size, int bits, bool right);
 
 // Verificación y reconstrucción
-bool verifyMasking(unsigned char* image, unsigned char* mask, int width, int height,
-                   int maskWidth, int maskHeight, int seed, unsigned int* maskingData);
+bool verifyMasking(unsigned char* image, unsigned char* mask,
+                   int imgWidth, int imgHeight,
+                   int maskWidth, int maskHeight,
+                   int seed, unsigned int* maskingData) {
+    int imgSize = imgWidth * imgHeight * 3;
+    int maskSize = maskWidth * maskHeight * 3;
+
+    for (int k = 0; k < maskSize; ++k) {
+        int pos = (seed + k) % imgSize;
+        unsigned char sum = image[pos] + mask[k % maskSize];
+        if (sum != maskingData[k]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 
 unsigned char* applyTransformationsInverse(unsigned char* finalImage, unsigned char* IM,
                                            const vector<Transformation> &transformations,
@@ -90,3 +107,24 @@ unsigned char* findCorrectReconstruction(unsigned char* finalImage, unsigned cha
                                          unsigned int** maskingDataArray, int* seeds,
                                          int numTransformations);
 
+void applyXOR(unsigned char* img1, unsigned char* img2, int size) {
+    for (int i = 0; i < size; ++i) {
+        img1[i] ^= img2[i];
+    }
+}
+
+unsigned char rotateRight(unsigned char value, int bits) {
+    bits = bits % MAX_BITS;
+    return (value >> bits) | (value << (MAX_BITS - bits));
+}
+
+unsigned char rotateLeft(unsigned char value, int bits) {
+    bits = bits % MAX_BITS;
+    return (value << bits) | (value >> (MAX_BITS - bits));
+}
+
+void applyRotation(unsigned char* img, int size, int bits, bool right) {
+    for (int i = 0; i < size; ++i) {
+        img[i] = right ? rotateRight(img[i], bits) : rotateLeft(img[i], bits);
+    }
+}
