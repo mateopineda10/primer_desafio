@@ -9,7 +9,7 @@
 using namespace std;
 
 // ==============================================
-// DECLARACIONES
+// DECLARACIONES FUNCIONES Y CODIGO
 // ==============================================
 
 enum TransformationType { XOR_OP, ROTATE_RIGHT_OP, ROTATE_LEFT_OP };
@@ -20,14 +20,60 @@ struct Transformation {
 };
 
 // Funciones originales
-unsigned char* loadPixels(QString input, int &width, int &height);
-bool exportImage(unsigned char* pixelData, int width, int height, QString archivoSalida);
-unsigned int* loadSeedMasking(const char* nombreArchivo, int &seed, int &n_pixels);
+unsigned char* loadPixels(QString input, int &width, int &height) {
+    QImage imagen(input);
+    if (imagen.isNull()) {
+        cerr << "Error al cargar: " << input.toStdString() << endl;
+        return nullptr;
+    }
+    imagen = imagen.convertToFormat(QImage::Format_RGB888);
+    width = imagen.width();
+    height = imagen.height();
+    unsigned char* pixelData = new unsigned char[width * height * 3];
+    for (int y = 0; y < height; ++y) {
+        memcpy(pixelData + y * width * 3, imagen.scanLine(y), width * 3);
+    }
+    return pixelData;
+}
+
+bool exportImage(unsigned char* pixelData, int width, int height, QString archivoSalida) {
+    QImage outputImage(width, height, QImage::Format_RGB888);
+    for (int y = 0; y < height; ++y) {
+        memcpy(outputImage.scanLine(y), pixelData + y * width * 3, width * 3);
+    }
+    return outputImage.save(archivoSalida, "BMP");
+}
+
+unsigned int* loadSeedMasking(const char* nombreArchivo, int &seed, int &n_pixels) {
+    ifstream archivo(nombreArchivo);
+    if (!archivo.is_open()) {
+        cerr << "Error al abrir: " << nombreArchivo << endl;
+        return nullptr;
+    }
+    archivo >> seed;
+    n_pixels = 0;
+    int r, g, b;
+    while (archivo >> r >> g >> b) n_pixels++;
+
+    archivo.close();
+    archivo.open(nombreArchivo);
+    archivo >> seed;
+
+    unsigned int* data = new unsigned int[n_pixels * 3];
+    for (int i = 0; i < n_pixels * 3; i += 3) {
+        archivo >> data[i] >> data[i+1] >> data[i+2];
+    }
+    archivo.close();
+    return data;
+}
 
 // Operaciones a nivel de bit
 void applyXOR(unsigned char* image1, unsigned char* image2, int size);
+
 unsigned char rotateRight(unsigned char value, int bits);
+
 unsigned char rotateLeft(unsigned char value, int bits);
+
 void applyRotation(unsigned char* image, int size, int bits, bool right);
 
 // Verificación y reconstrucción
