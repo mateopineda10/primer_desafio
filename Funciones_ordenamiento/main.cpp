@@ -1,53 +1,46 @@
+#include <fstream>
 #include <iostream>
+#include <QCoreApplication>
+#include <QImage>
+#include <QString>
+#include <vector>
+#include <algorithm>
 
 using namespace std;
 
+// ==============================================
+// DECLARACIONES
+// ==============================================
 
+enum TransformationType { XOR_OP, ROTATE_RIGHT_OP, ROTATE_LEFT_OP };
 
-int main()
-    // Función para realizar XOR entre dos imágenes
-    void applyXOR(unsigned char* image1, unsigned char* image2, int width, int height) {
-    for (int i = 0; i < width * height * 3; i++) {
-        image1[i] = image1[i] ^ image2[i];
-    }
-}
+struct Transformation {
+    TransformationType type;
+    int bits;
+};
 
-// Función para rotar bits a la derecha
-unsigned char rotateRight(unsigned char value, int bits) {
-    bits = bits % 8;
-    return (value >> bits) | (value << (8 - bits));
-}
+// Funciones originales
+unsigned char* loadPixels(QString input, int &width, int &height);
+bool exportImage(unsigned char* pixelData, int width, int height, QString archivoSalida);
+unsigned int* loadSeedMasking(const char* nombreArchivo, int &seed, int &n_pixels);
 
-// Función para rotar bits a la izquierda (necesaria para revertir)
-unsigned char rotateLeft(unsigned char value, int bits) {
-    bits = bits % 8;
-    return (value << bits) | (value >> (8 - bits));
-}
+// Operaciones a nivel de bit
+void applyXOR(unsigned char* image1, unsigned char* image2, int size);
+unsigned char rotateRight(unsigned char value, int bits);
+unsigned char rotateLeft(unsigned char value, int bits);
+void applyRotation(unsigned char* image, int size, int bits, bool right);
 
-// Aplicar rotación a toda una imagen
-void applyRotation(unsigned char* image, int width, int height, int bits, bool right) {
-    for (int i = 0; i < width * height * 3; i++) {
-        if (right) {
-            image[i] = rotateRight(image[i], bits);
-        } else {
-            image[i] = rotateLeft(image[i], bits);
-        }
-    }
-}
-{
-    bool verifyMasking(unsigned char* image, unsigned char* mask, int width, int height,
-                       int maskWidth, int maskHeight, int seed, unsigned int* maskingData) {
-        int maskSize = maskWidth * maskHeight * 3;
-        int imageSize = width * height * 3;
+// Verificación y reconstrucción
+bool verifyMasking(unsigned char* image, unsigned char* mask, int width, int height,
+                   int maskWidth, int maskHeight, int seed, unsigned int* maskingData);
 
-        for (int k = 0; k < maskSize; k++) {
-            int pos = (seed + k) % imageSize;
-            unsigned char sum = image[pos] + mask[k % (maskWidth * maskHeight * 3)];
+unsigned char* applyTransformationsInverse(unsigned char* finalImage, unsigned char* IM,
+                                           const vector<Transformation> &transformations,
+                                           int width, int height);
 
-            if (sum != maskingData[k]) {
-                return false;
-            }
-        }
-        return true;
-    }
-}
+unsigned char* findCorrectReconstruction(unsigned char* finalImage, unsigned char* IM,
+                                         unsigned char* mask, int width, int height,
+                                         int maskWidth, int maskHeight,
+                                         unsigned int** maskingDataArray, int* seeds,
+                                         int numTransformations);
+
