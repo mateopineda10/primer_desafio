@@ -1,10 +1,7 @@
 #include <fstream>
 #include <iostream>
-#include <QCoreApplication>
 #include <QImage>
 #include <QString>
-#include <vector>
-#include <algorithm>
 
 using namespace std;
 
@@ -178,6 +175,53 @@ bool testTransformations(unsigned char* finalImage, unsigned char* IM,
     return valid;
 }
 
+unsigned char* reconstructImage(unsigned char* finalImage, unsigned char* IM,
+                                unsigned char* mask, int width, int height,
+                                int maskWidth, int maskHeight,
+                                unsigned int** maskingDataArray, int* seeds,
+                                int numTransformations) {
+    // Primero probamos la secuencia conocida del ejemplo
+    Transformation knownSequence[] = {
+        {XOR_OP, 0},
+        {ROTATE_RIGHT_OP, 3},
+        {XOR_OP, 0}
+    };
+
+    if (testTransformations(finalImage, IM, mask, width, height,
+                            maskWidth, maskHeight, maskingDataArray, seeds,
+                            numTransformations, knownSequence)) {
+        return applyInverseTransformations(finalImage, IM, knownSequence,
+                                           3, width, height);
+    }
+
+    // Si no funciona, probamos todas las combinaciones posibles
+    const int MAX_TRANSFORMS = 17; // 1 XOR + 8 rot derecha + 8 rot izquierda
+    Transformation possibleTransforms[MAX_TRANSFORMS];
+    int transformCount;
+    generatePossibleTransformations(possibleTransforms, transformCount);
+
+    // Probamos todas las combinaciones de 3 transformaciones
+    for (int i = 0; i < transformCount; ++i) {
+        for (int j = 0; j < transformCount; ++j) {
+            for (int k = 0; k < transformCount; ++k) {
+                Transformation candidate[] = {
+                    possibleTransforms[i],
+                    possibleTransforms[j],
+                    possibleTransforms[k]
+                };
+
+                if (testTransformations(finalImage, IM, mask, width, height,
+                                        maskWidth, maskHeight, maskingDataArray, seeds,
+                                        numTransformations, candidate)) {
+                    return applyInverseTransformations(finalImage, IM, candidate,
+                                                       3, width, height);
+                }
+            }
+        }
+    }
+
+    return nullptr;
+}
 // ==============================================
 
 void applyXOR(unsigned char* img1, unsigned char* img2, int size) {
@@ -200,4 +244,64 @@ void applyRotation(unsigned char* img, int size, int bits, bool right) {
     for (int i = 0; i < size; ++i) {
         img[i] = right ? rotateRight(img[i], bits) : rotateLeft(img[i], bits);
     }
+}
+
+// ==============================================
+// FUNCIÓN PRINCIPAL
+// ==============================================
+
+int main() {
+    // Cargar imágenes
+    int width, height, maskWidth, maskHeight;
+    unsigned char* finalImage = loadPixels("I_D.bmp", width, height);
+    unsigned char* IM = loadPixels("I_M.bmp", width, height);
+    unsigned char* mask = loadPixels("M.bmp", maskWidth, maskHeight);
+
+    if (!finalImage || !IM || !mask) {
+        cerr << "Error al cargar imágenes requeridas" << endl;
+        return 1;
+    }
+
+    // Cargar datos de enmascaramiento
+    int numTransformations = 2; // M1.txt y M2.txt
+    unsigned int** maskingDataArray = new unsigned int*[numTransformations];
+    int* seeds = new int[numTransformations];
+    int* n_pixels = new int[numTransformations];
+
+    for (int i = 0; i < numTransformations; ++i) {
+        char filename[20];
+        sprintf(filename, "M%d.txt", i+1);
+        maskingDataArray[i] = loadSeedMasking(filename, seeds[i], n_pixels[i]);
+        if (!maskingDataArray[i]) {
+            cerr << "Error al cargar archivo de enmascaramiento: " << filename << endl;
+            return 1;
+        }
+    }
+
+    // Reconstruir imagen
+    unsigned char* original = reconstructImage(finalImage, IM, mask, width, height,
+                                               maskWidth, maskHeight, maskingDataArray,
+                                               seeds, numTransformations);
+
+    if (original) {
+        if (exportImage(original, width, height, "reconstructed.bmp")) {
+            cout << "Imagen reconstruida exitosamente!" << endl;
+        }
+        delete[] original;
+    } else {
+        cerr << "No se pudo reconstruir la imagen" << endl;
+    }
+
+    // Liberar memoria
+    delete[] finalImage;
+    delete[] IM;
+    delete[] mask;
+    for (int i = 0; i < numTransformations; ++i) {
+        delete[] maskingDataArray[i];
+    }
+    delete[] maskingDataArray;
+    delete[] seeds;
+    delete[] n_pixels;
+
+    return 0;
 }

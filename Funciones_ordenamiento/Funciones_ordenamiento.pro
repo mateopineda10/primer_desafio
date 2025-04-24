@@ -1,7 +1,6 @@
-TEMPLATE = app
+QT += core gui
 CONFIG += console c++17
-CONFIG -= app_bundle
-CONFIG -= qt
+CONFIG -= c++17 cmdline
 
 SOURCES += \
         main.cpp
